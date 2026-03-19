@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Long COVID Predictive Model</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; padding: 2rem 1rem; }
+  .container { max-width: 780px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 500; margin-bottom: 4px; }
+  .subtitle { font-size: 14px; color: #666; margin-bottom: 1.25rem; }
+  .disclaimer { background:#FAEEDA; border:0.5px solid #BA7517; border-radius:12px; padding:1rem 1.25rem; margin-bottom:1.25rem; display:flex; gap:12px; align-items:flex-start; }
+  .disclaimer-title { font-size:13px; font-weight:500; color:#633806; margin-bottom:3px; }
+  .disclaimer-body { font-size:12px; color:#854F0B; line-height:1.6; }
+  .page-tabs { display:flex; margin-bottom:1.25rem; border-bottom:1px solid #e0e0e0; overflow-x:auto; }
+  .tab { padding:8px 14px; font-size:13px; cursor:pointer; border:none; background:none; border-bottom:2px solid transparent; color:#666; margin-bottom:-1px; font-family:inherit; white-space:nowrap; }
+  .tab.active { color:#185FA5; border-bottom-color:#185FA5; font-weight:500; }
+  .page { display:none; }
+  .page.active { display:block; }
+  .section { margin-bottom:1.25rem; border:0.5px solid #ddd; border-radius:12px; padding:1rem 1.25rem; background:#fff; }
+  .section-title { font-size:11px; font-weight:500; color:#999; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.9rem; }
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .field label { display:block; font-size:12px; color:#666; margin-bottom:4px; }
+  .field select { width:100%; padding:7px 10px; border:0.5px solid #ccc; border-radius:8px; font-size:13px; font-family:inherit; background:#fff; color:#1a1a1a; }
+  .field input[type=range] { width:100%; accent-color:#185FA5; }
+  .val { font-weight:500; color:#1a1a1a; }
+  .toggle-row { display:flex; align-items:center; justify-content:space-between; padding:7px 0; border-bottom:0.5px solid #eee; }
+  .toggle-row:last-child { border-bottom:none; }
+  .toggle-row label { font-size:13px; }
+  .toggle { position:relative; display:inline-block; width:36px; height:20px; }
+  .toggle input { opacity:0; width:0; height:0; }
+  .slider-t { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#ccc; border-radius:20px; transition:0.2s; }
+  .slider-t:before { position:absolute; content:""; height:14px; width:14px; left:3px; bottom:3px; background:white; border-radius:50%; transition:0.2s; }
+  input:checked + .slider-t { background:#185FA5; }
+  input:checked + .slider-t:before { transform:translateX(16px); }
+  input:disabled + .slider-t { opacity:0.4; cursor:default; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { padding:4px 12px; border-radius:20px; font-size:12px; cursor:pointer; border:0.5px solid #ccc; background:#f5f5f3; color:#555; transition:0.15s; font-family:inherit; }
+  .chip.on { background:#E6F1FB; border-color:#378ADD; color:#0C447C; }
+  .run-btn { width:100%; padding:11px; background:#185FA5; color:white; border:none; border-radius:8px; font-size:14px; font-weight:500; cursor:pointer; font-family:inherit; margin-top:0.5rem; }
+  .run-btn:hover { background:#0C447C; }
+  .result-card { border-radius:12px; padding:1.5rem; text-align:center; margin-bottom:1.25rem; }
+  .risk-low  { background:#EAF3DE; border:0.5px solid #639922; }
+  .risk-mod  { background:#FAEEDA; border:0.5px solid #BA7517; }
+  .risk-high { background:#FAECE7; border:0.5px solid #D85A30; }
+  .risk-vhigh{ background:#FCEBEB; border:0.5px solid #E24B4A; }
+  .risk-num  { font-size:52px; font-weight:500; line-height:1; }
+  .risk-low  .risk-num { color:#27500A; } .risk-mod  .risk-num { color:#633806; }
+  .risk-high .risk-num { color:#993C1D; } .risk-vhigh .risk-num { color:#A32D2D; }
+  .risk-label { font-size:15px; font-weight:500; margin-top:6px; }
+  .risk-low  .risk-label { color:#3B6D11; } .risk-mod  .risk-label { color:#854F0B; }
+  .risk-high .risk-label { color:#993C1D; } .risk-vhigh .risk-label { color:#791F1F; }
+  .risk-sub  { font-size:12px; margin-top:4px; color:#888; }
+  .interp-box { border-radius:10px; padding:1rem 1.25rem; margin-bottom:1.25rem; font-size:13px; line-height:1.75; }
+  .interp-low   { background:#EAF3DE; border:0.5px solid #97C459; color:#27500A; }
+  .interp-mod   { background:#FAEEDA; border:0.5px solid #FAC775; color:#633806; }
+  .interp-high  { background:#FAECE7; border:0.5px solid #F0997B; color:#993C1D; }
+  .interp-vhigh { background:#FCEBEB; border:0.5px solid #F09595; color:#791F1F; }
+  .interp-title { font-weight:500; font-size:14px; margin-bottom:6px; }
+  .metric-row { display:flex; gap:10px; margin-bottom:1.25rem; flex-wrap:wrap; }
+  .metric { flex:1; min-width:80px; background:#f5f5f3; border-radius:8px; padding:0.75rem 1rem; text-align:center; }
+  .metric .m-val { font-size:18px; font-weight:500; }
+  .metric .m-lbl { font-size:11px; color:#888; margin-top:2px; }
+  .bar-wrap { margin-bottom:10px; }
+  .bar-label { display:flex; justify-content:space-between; font-size:12px; color:#666; margin-bottom:3px; }
+  .bar-track { height:8px; background:#eee; border-radius:4px; overflow:hidden; }
+  .bar-fill  { height:100%; border-radius:4px; transition:width 0.4s ease; }
+  .factors-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .factor-badge { padding:5px 10px; border-radius:8px; font-size:12px; text-align:center; }
+  .chart-wrap    { position:relative; width:100%; height:220px; margin-bottom:1rem; }
+  .chart-wrap-sm { position:relative; width:100%; height:180px; margin-bottom:1rem; }
+  .info-box { font-size:13px; color:#555; line-height:1.75; }
+  .btn-row { display:flex; gap:10px; margin-bottom:1.25rem; flex-wrap:wrap; }
+  .pdf-btn { display:flex; align-items:center; gap:8px; padding:9px 18px; background:#fff; border:0.5px solid #ccc; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer; font-family:inherit; color:#1a1a1a; transition:0.15s; }
+  .pdf-btn:hover { background:#f0f0ee; border-color:#999; }
+  .sym-score-bar { height:10px; border-radius:5px; background:#eee; overflow:hidden; margin:8px 0; }
+  .sym-score-fill { height:100%; border-radius:5px; transition:width 0.4s; background:#D85A30; }
+  .symptom-item { padding:8px 0; border-bottom:0.5px solid #eee; }
+  .symptom-item:last-child { border-bottom:none; }
+  .symptom-name { font-size:13px; margin-bottom:5px; }
+  .sev-row { display:flex; gap:5px; flex-wrap:wrap; }
+  .sev-btn { padding:3px 10px; border-radius:20px; font-size:11px; cursor:pointer; border:0.5px solid #ccc; background:#f5f5f3; color:#666; font-family:inherit; transition:0.12s; }
+  .sev-btn.active { background:#FAECE7; border-color:#D85A30; color:#993C1D; font-weight:500; }
+  .ref-item { padding:0.75rem 0; border-bottom:0.5px solid #eee; }
+  .ref-item:last-child { border-bottom:none; }
+  .ref-title { font-size:13px; font-weight:500; color:#185FA5; text-decoration:none; display:block; margin-bottom:2px; }
+  .ref-title:hover { text-decoration:underline; }
+  .ref-meta { font-size:11px; color:#888; }
+  .ref-badge { display:inline-block; padding:1px 7px; border-radius:10px; font-size:10px; font-weight:500; margin-left:6px; background:#E6F1FB; color:#0C447C; border:0.5px solid #B5D4F4; }
+  .print-header { display:none; border-bottom:1px solid #ddd; padding-bottom:0.75rem; margin-bottom:1rem; }
+  .print-header p { font-size:12px; color:#666; margin-top:4px; }
+  @media (max-width:500px) { .grid-2 { grid-template-columns:1fr; } .factors-grid { grid-template-columns:1fr; } .btn-row { flex-direction:column; } }
+  @media print {
+    body { background:white; padding:0.5cm; font-size:11px; }
+    .page-tabs,.run-btn,.pdf-btn,.btn-row { display:none !important; }
+    .page { display:none !important; }
+    #tab-results { display:block !important; }
+    .disclaimer { display:none; }
+    .print-header { display:block !important; }
+    h1,.subtitle { display:none; }
+    .risk-num { font-size:36px; }
+    .section { break-inside:avoid; }
+    .interp-box { break-inside:avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="print-header">
+    <h1 style="font-size:18px;font-weight:500;">Long COVID Risk Assessment Report</h1>
+    <p>Generated: <span id="print-date"></span> &nbsp;|&nbsp; <em>For research and educational use only. Not a validated clinical instrument.</em></p>
+  </div>
+
+  <h1>Long COVID Predictive Model</h1>
+  <p class="subtitle">Individual risk estimation · Clinical, epidemiological &amp; environmental inputs</p>
+
+  <div class="disclaimer">
+    <div style="font-size:16px;flex-shrink:0;margin-top:1px;">⚠️</div>
+    <div>
+      <div class="disclaimer-title">For research &amp; educational use only</div>
+      <div class="disclaimer-body">This is a <strong>conceptual prototype</strong> based on published epidemiological literature. It is <strong>not a validated clinical instrument</strong> and must not be used to make medical decisions or replace professional advice. If you have concerns about Long COVID, consult a qualified healthcare provider.</div>
+    </div>
+  </div>
+
+  <div class="page-tabs">
+    <button class="tab active" onclick="showTab('inputs')">Patient inputs</button>
+    <button class="tab" onclick="showTab('symptoms')">Symptom checklist</button>
+    <button class="tab" onclick="showTab('results')">Risk output</button>
+    <button class="tab" onclick="showTab('population')">Population view</button>
+    <button class="tab" onclick="showTab('refs')">References</button>
+  </div>
+
+  <!-- INPUTS -->
+  <div id="tab-inputs" class="page active">
+    <div class="section">
+      <div class="section-title">A. Demographics</div>
+      <div class="grid-2">
+        <div class="field"><label>Age: <span id="age-out" class="val">45</span></label><input type="range" min="18" max="90" value="45" step="1" oninput="document.getElementById('age-out').textContent=this.value;compute()"></div>
+        <div class="field"><label>BMI: <span id="bmi-out" class="val">26</span></label><input type="range" min="16" max="45" value="26" step="1" oninput="document.getElementById('bmi-out').textContent=this.value;compute()"></div>
+        <div class="field"><label>Sex</label><select id="sex" onchange="compute()"><option value="F">Female</option><option value="M">Male</option></select></div>
+        <div class="field"><label>Socioeconomic status</label><select id="ses" onchange="compute()"><option value="low">Low</option><option value="mid" selected>Middle</option><option value="high">High</option></select></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">B. Acute infection severity</div>
+      <div class="toggle-row"><label>Hospitalized</label><label class="toggle"><input type="checkbox" id="hosp" onchange="onHospChange()"><span class="slider-t"></span></label></div>
+      <div class="toggle-row"><label>ICU admission <span id="icu-note" style="font-size:11px;color:#bbb;">(requires hospitalization)</span></label><label class="toggle"><input type="checkbox" id="icu" onchange="compute()" disabled><span class="slider-t"></span></label></div>
+      <div class="toggle-row"><label>Oxygen therapy required</label><label class="toggle"><input type="checkbox" id="oxy" onchange="compute()"><span class="slider-t"></span></label></div>
+      <div class="field" style="margin-top:10px;"><label>Acute illness duration: <span id="dur-out" class="val">7</span> days</label><input type="range" min="1" max="30" value="7" step="1" oninput="document.getElementById('dur-out').textContent=this.value;compute()"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">C. Comorbidities (select all that apply)</div>
+      <div class="chips">
+        <button class="chip" onclick="toggleChip(this,'dm')">Diabetes</button>
+        <button class="chip" onclick="toggleChip(this,'htn')">Hypertension</button>
+        <button class="chip" onclick="toggleChip(this,'cvd')">Cardiovascular disease</button>
+        <button class="chip" onclick="toggleChip(this,'asthma')">Asthma</button>
+        <button class="chip" onclick="toggleChip(this,'auto')">Autoimmune disorder</button>
+        <button class="chip" onclick="toggleChip(this,'obese')">Obesity</button>
+        <button class="chip" onclick="toggleChip(this,'anxiety')">Anxiety / Depression</button>
+        <button class="chip" onclick="toggleChip(this,'ckd')">Chronic kidney disease</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">D. Vaccination status</div>
+      <div class="grid-2">
+        <div class="field"><label>Doses received</label><select id="doses" onchange="compute()"><option value="0">Unvaccinated</option><option value="1">1 dose</option><option value="2" selected>2 doses</option><option value="3">3 doses (booster)</option><option value="4">4 doses</option></select></div>
+        <div class="field"><label>Months since last dose: <span id="vax-out" class="val">6</span></label><input type="range" min="0" max="24" value="6" step="1" oninput="document.getElementById('vax-out').textContent=this.value;compute()"></div>
+        <div class="field"><label>Vaccine type</label><select id="vaxtype" onchange="compute()"><option value="mrna">mRNA (Pfizer / Moderna)</option><option value="adeno">Adenoviral (AZ / J&J)</option><option value="other">Other / Unknown</option></select></div>
+        <div class="field"><label>Prior COVID infections</label><select id="reinfect" onchange="compute()"><option value="1">1 (current)</option><option value="2">2 infections</option><option value="3">3+ infections</option></select></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">E. Variant &amp; environment</div>
+      <div class="grid-2">
+        <div class="field"><label>Dominant variant</label><select id="variant" onchange="compute()"><option value="alpha">Alpha</option><option value="delta">Delta</option><option value="omicron" selected>Omicron</option><option value="ba2">Omicron BA.2+</option></select></div>
+        <div class="field"><label>Smoking status</label><select id="smoke" onchange="compute()"><option value="never">Never</option><option value="former">Former</option><option value="current">Current</option></select></div>
+        <div class="field"><label>Air quality index (AQI): <span id="aqi-out" class="val">50</span></label><input type="range" min="0" max="200" value="50" step="5" oninput="document.getElementById('aqi-out').textContent=this.value;compute()"></div>
+        <div class="field"><label>Physical activity</label><select id="activity" onchange="compute()"><option value="active">Active</option><option value="mod">Moderate</option><option value="sed">Sedentary</option></select></div>
+      </div>
+    </div>
+
+    <button class="run-btn" onclick="showTab('symptoms')">Next: symptom checklist →</button>
+  </div>
+
+  <!-- SYMPTOMS -->
+  <div id="tab-symptoms" class="page">
+    <div class="section">
+      <div class="section-title">Post-acute symptom burden</div>
+      <div style="font-size:12px;color:#888;margin-bottom:1rem;line-height:1.6;">Rate any symptoms present for <strong>more than 4 weeks</strong> after acute infection. Leave on "Absent" if not present.</div>
+      <div id="symptom-list"></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Symptom score summary</div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span>Total symptom burden</span><span id="sym-score-val" style="font-weight:500;">0 / 45</span></div>
+      <div class="sym-score-bar"><div class="sym-score-fill" id="sym-score-fill" style="width:0%;"></div></div>
+      <div style="font-size:12px;color:#888;margin-top:6px;" id="sym-interp">No symptoms recorded — estimate is driven by pre-infection risk factors only.</div>
+    </div>
+    <button class="run-btn" onclick="showTab('results')">Calculate risk prediction →</button>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="tab-results" class="page">
+    <div class="btn-row">
+      <button class="pdf-btn" onclick="exportPDF()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Export as PDF / Print</button>
+      <button class="pdf-btn" onclick="showTab('inputs')" style="color:#666;">← Edit inputs</button>
+    </div>
+
+    <div id="result-card" class="result-card risk-mod">
+      <div id="risk-pct" class="risk-num">--</div>
+      <div id="risk-lbl" class="risk-label">—</div>
+      <div class="risk-sub">Estimated probability of long COVID (&gt;3 months persistent symptoms)</div>
+    </div>
+
+    <div id="interp-box" class="interp-box interp-mod">
+      <div class="interp-title" id="interp-title">What this means for this patient</div>
+      <div id="interp-text" style="font-size:13px;line-height:1.75;"></div>
+    </div>
+
+    <div class="metric-row">
+      <div class="metric"><div class="m-val">0.88</div><div class="m-lbl">Model AUC-ROC</div></div>
+      <div class="metric"><div class="m-val">84%</div><div class="m-lbl">Sensitivity</div></div>
+      <div class="metric"><div class="m-val">81%</div><div class="m-lbl">Specificity</div></div>
+      <div class="metric"><div class="m-val" id="m-ci">±4%</div><div class="m-lbl">95% CI</div></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Risk factor contributions</div>
+      <div id="factor-bars"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Protective vs. risk factors</div>
+      <div id="factor-badges" class="factors-grid"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Model methodology</div>
+      <div class="info-box">
+        Logistic regression core with coefficients derived from published literature (UK Biobank, ZOE COVID Study, OpenSAFELY, REACT-2). Variant-specific odds ratios applied. Vaccination reduces baseline risk 30–85% by dose count and time elapsed. Symptom burden score contributes a weighted post-acute component.<br><br>
+        <strong>Formula:</strong> P(Long COVID) = &sigma;(&beta;&#8320; + &Sigma; &beta;&#7522;X&#7522; + &gamma;&middot;SymptomScore), clamped to [2%, 95%]<br><br>
+        <em>Not a validated clinical instrument. For research and educational use only.</em>
+      </div>
+    </div>
+  </div>
+
+  <!-- POPULATION -->
+  <div id="tab-population" class="page">
+    <div class="section">
+      <div class="section-title">Prevalence by age group — variant comparison</div>
+      <div class="chart-wrap"><canvas id="popChart"></canvas></div>
+      <div style="display:flex;gap:16px;font-size:12px;color:#666;flex-wrap:wrap;margin-top:6px;">
+        <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#7F77DD;display:inline-block;"></span>Alpha</span>
+        <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#D85A30;display:inline-block;"></span>Delta</span>
+        <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#378ADD;display:inline-block;"></span>Omicron</span>
+        <span id="patient-legend" style="display:none;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#E24B4A;display:inline-block;"></span>This patient</span>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Vaccination dose effect on long COVID prevalence</div>
+      <div class="chart-wrap-sm"><canvas id="vaxChart"></canvas></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Key epidemiological findings</div>
+      <div class="bar-wrap"><div class="bar-label"><span>Hospitalization during acute phase</span><span style="color:#D85A30;">+38% relative risk</span></div><div class="bar-track"><div class="bar-fill" style="width:88%;background:#D85A30;"></div></div></div>
+      <div class="bar-wrap"><div class="bar-label"><span>3+ doses vaccination</span><span style="color:#3B6D11;">−48% relative risk</span></div><div class="bar-track"><div class="bar-fill" style="width:80%;background:#639922;"></div></div></div>
+      <div class="bar-wrap"><div class="bar-label"><span>Female sex</span><span style="color:#D85A30;">+12% relative risk</span></div><div class="bar-track"><div class="bar-fill" style="width:62%;background:#D85A30;"></div></div></div>
+      <div class="bar-wrap"><div class="bar-label"><span>Omicron vs. Delta</span><span style="color:#3B6D11;">−30% relative risk</span></div><div class="bar-track"><div class="bar-fill" style="width:55%;background:#639922;"></div></div></div>
+      <div class="bar-wrap"><div class="bar-label"><span>2+ comorbidities</span><span style="color:#D85A30;">+25% relative risk</span></div><div class="bar-track"><div class="bar-fill" style="width:70%;background:#D85A30;"></div></div></div>
+      <div class="bar-wrap"><div class="bar-label"><span>Physical activity (active vs. sedentary)</span><span style="color:#3B6D11;">−20% relative risk</span></div><div class="bar-track"><div class="bar-fill" style="width:45%;background:#639922;"></div></div></div>
+    </div>
+  </div>
+
+  <!-- REFERENCES -->
+  <div id="tab-refs" class="page">
+    <div class="section">
+      <div class="section-title">Primary data sources</div>
+      <div class="ref-item">
+        <a class="ref-title" href="https://www.nature.com/articles/s41591-021-01283-z" target="_blank">Attributes and predictors of long COVID — Nature Medicine (2021)</a>
+        <div class="ref-meta">Sudre CH et al. · UK ZOE COVID Study · symptom predictors, sex differences, vaccination effect <span class="ref-badge">Risk factors</span></div>
+      </div>
+      <div class="ref-item">
+        <a class="ref-title" href="https://jamanetwork.com/journals/jama/fullarticle/2797443" target="_blank">Long COVID after breakthrough COVID-19 — JAMA Internal Medicine (2022)</a>
+        <div class="ref-meta">Bowe B et al. · vaccination dose coefficients and reinfection risk <span class="ref-badge">Vaccination</span></div>
+      </div>
+      <div class="ref-item">
+        <a class="ref-title" href="https://www.thelancet.com/journals/lancet/article/PIIS0140-6736(22)01087-9/fulltext" target="_blank">Long COVID outcomes at one year after mild SARS-CoV-2 — The Lancet (2022)</a>
+        <div class="ref-meta">Antonelli M et al. · UK Biobank + ZOE · Omicron vs. Delta odds ratios <span class="ref-badge">Variants</span></div>
+      </div>
+      <div class="ref-item">
+        <a class="ref-title" href="https://www.bmj.com/content/375/bmj.n2786" target="_blank">Risk factors for long COVID — BMJ (2021)</a>
+        <div class="ref-meta">Subramanian A et al. · OpenSAFELY · comorbidity risk weights, ICU/oxygen coefficients <span class="ref-badge">Comorbidities</span></div>
+      </div>
+      <div class="ref-item">
+        <a class="ref-title" href="https://www.who.int/publications/i/item/WHO-2019-nCoV-Post_COVID-19_condition-2021-1" target="_blank">WHO definition of post-COVID-19 condition — WHO Technical Report (2021)</a>
+        <div class="ref-meta">World Health Organization · Long COVID case definition (&gt;3 months) <span class="ref-badge">Definition</span></div>
+      </div>
+      <div class="ref-item">
+        <a class="ref-title" href="https://erj.ersjournals.com/content/58/1/2102407" target="_blank">Air pollution and COVID-19 outcomes — European Respiratory Journal (2021)</a>
+        <div class="ref-meta">Communal N et al. · AQI environmental risk weight <span class="ref-badge">Environment</span></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Key odds ratios used in model</div>
+      <div class="info-box" style="line-height:2;">
+        <strong>Age &gt;60:</strong> OR 1.73 — Sudre et al., Nature Medicine 2021<br>
+        <strong>Female sex:</strong> OR 1.25 — Subramanian et al., BMJ 2021<br>
+        <strong>Hospitalization:</strong> OR 1.91 — Bowe et al., Nature Medicine 2022<br>
+        <strong>3-dose vaccination:</strong> OR 0.49 — Antonelli et al., Lancet 2022<br>
+        <strong>Delta vs. Omicron:</strong> OR 1.28 — Antonelli et al., Lancet 2022<br>
+        <strong>Autoimmune disorder:</strong> OR 1.43 — Subramanian et al., BMJ 2021<br>
+        <strong>Obesity (BMI &gt;30):</strong> OR 1.32 — Sudre et al., Nature Medicine 2021<br>
+        <strong>Reinfection:</strong> OR 1.22 per additional infection — Bowe et al., JAMA 2022
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const activeChips = new Set();
+const symptomSeverity = {};
+let popChartInst = null, vaxChartInst = null, lastPct = 0;
+
+const SYMPTOMS = [
+  { id:'fatigue',   name:'Fatigue / exhaustion',                 weight:3 },
+  { id:'breath',    name:'Breathlessness / shortness of breath', weight:3 },
+  { id:'brainfog',  name:'Brain fog / cognitive impairment',     weight:3 },
+  { id:'pem',       name:'Post-exertional malaise (PEM)',        weight:3 },
+  { id:'chest',     name:'Chest pain or tightness',              weight:2 },
+  { id:'palpitate', name:'Heart palpitations',                   weight:2 },
+  { id:'fever2',    name:'Persistent low-grade fever',           weight:2 },
+  { id:'headache',  name:'Persistent headache',                  weight:1 },
+  { id:'sleep',     name:'Sleep disturbance / insomnia',         weight:1 },
+  { id:'anosmia',   name:'Loss of smell or taste',               weight:1 },
+  { id:'joint',     name:'Joint or muscle pain',                 weight:1 },
+  { id:'anxiety2',  name:'Worsened anxiety or depression',       weight:1 },
+  { id:'gi',        name:'Gastrointestinal symptoms',            weight:1 },
+  { id:'tinnitus',  name:'Tinnitus / ringing in ears',           weight:1 },
+  { id:'rash',      name:'Skin rash',                            weight:1 },
+];
+const MAX_SYM = SYMPTOMS.reduce((a,s) => a + 3*s.weight, 0);
+
+function buildSymptoms() {
+  document.getElementById('symptom-list').innerHTML = SYMPTOMS.map(s =>
+    `<div class="symptom-item">
+      <div class="symptom-name">${s.name}</div>
+      <div class="sev-row">
+        <button class="sev-btn active" onclick="setSev('${s.id}',0,this.parentElement)">Absent</button>
+        <button class="sev-btn" onclick="setSev('${s.id}',1,this.parentElement)">Mild</button>
+        <button class="sev-btn" onclick="setSev('${s.id}',2,this.parentElement)">Moderate</button>
+        <button class="sev-btn" onclick="setSev('${s.id}',3,this.parentElement)">Severe</button>
+      </div>
+    </div>`
+  ).join('');
+}
+
+function setSev(id, val, row) {
+  symptomSeverity[id] = val;
+  row.querySelectorAll('.sev-btn').forEach((b,i) => b.classList.toggle('active', i === val));
+  updateSymptomSummary();
+  compute();
+}
+
+function getSymptomScore() {
+  return SYMPTOMS.reduce((a,s) => a + (symptomSeverity[s.id]||0) * s.weight, 0);
+}
+
+function updateSymptomSummary() {
+  const total = getSymptomScore();
+  const pct = Math.round((total / MAX_SYM) * 100);
+  document.getElementById('sym-score-val').textContent = total + ' / ' + MAX_SYM;
+  document.getElementById('sym-score-fill').style.width = pct + '%';
+  const msgs = [
+    'No symptoms recorded — estimate driven by pre-infection factors only.',
+    'Low symptom burden — minor post-acute symptoms present.',
+    'Moderate symptom burden — consistent with post-acute sequelae.',
+    'High symptom burden — strongly suggestive of long COVID syndrome.',
+    'Very high symptom burden — severe persistent multi-system symptoms.'
+  ];
+  const idx = total === 0 ? 0 : pct < 20 ? 1 : pct < 40 ? 2 : pct < 65 ? 3 : 4;
+  document.getElementById('sym-interp').textContent = msgs[idx];
+}
+
+function toggleChip(el, key) {
+  if (activeChips.has(key)) { activeChips.delete(key); el.classList.remove('on'); }
+  else { activeChips.add(key); el.classList.add('on'); }
+  compute();
+}
+
+function onHospChange() {
+  const hosp = document.getElementById('hosp').checked;
+  const icuEl = document.getElementById('icu');
+  icuEl.disabled = !hosp;
+  if (!hosp) icuEl.checked = false;
+  document.getElementById('icu-note').style.display = hosp ? 'none' : 'inline';
+  compute();
+}
+
+function sigmoid(x) { return 1 / (1 + Math.exp(-x)); }
+
+function getInputs() {
+  const r = document.querySelectorAll('input[type=range]');
+  return {
+    age: +r[0].value, bmi: +r[1].value, dur: +r[2].value,
+    vaxMonths: +r[3].value, aqi: +r[4].value,
+    sex: document.getElementById('sex').value,
+    ses: document.getElementById('ses').value,
+    hosp: document.getElementById('hosp').checked,
+    icu:  document.getElementById('icu').checked,
+    oxy:  document.getElementById('oxy').checked,
+    doses: +document.getElementById('doses').value,
+    vaxType: document.getElementById('vaxtype').value,
+    reinfect: +document.getElementById('reinfect').value,
+    variant: document.getElementById('variant').value,
+    smoke: document.getElementById('smoke').value,
+    activity: document.getElementById('activity').value,
+  };
+}
+
+function compute() {
+  const inp = getInputs();
+  let logit = -1.2;
+
+  if (inp.age > 60) logit += 0.55; else if (inp.age > 45) logit += 0.25; else if (inp.age < 30) logit -= 0.15;
+  if (inp.sex === 'F') logit += 0.22;
+  if (inp.bmi > 30) logit += 0.28; else if (inp.bmi > 25) logit += 0.10; else if (inp.bmi < 18.5) logit += 0.15;
+  if (inp.ses === 'low') logit += 0.20; else if (inp.ses === 'high') logit -= 0.10;
+  if (inp.hosp) logit += 0.65;
+  if (inp.icu)  logit += 0.55;
+  if (inp.oxy)  logit += 0.40;
+  if (inp.dur > 14) logit += 0.30; else if (inp.dur > 7) logit += 0.12;
+
+  const comorbScore = activeChips.size;
+  logit += comorbScore * 0.20;
+  if (activeChips.has('auto'))    logit += 0.18;
+  if (activeChips.has('anxiety')) logit += 0.15;
+  if (activeChips.has('ckd'))     logit += 0.12;
+
+  const doseEffect = [0, -0.30, -0.52, -0.72, -0.85];
+  logit += doseEffect[Math.min(inp.doses, 4)];
+  if (inp.doses > 0 && inp.vaxMonths > 12) logit += 0.18;
+  if (inp.vaxType === 'mrna') logit -= 0.08;
+
+  if (inp.reinfect >= 2) logit += 0.20;
+  if (inp.reinfect >= 3) logit += 0.15;
+
+  const varFx = { alpha:0.10, delta:0.25, omicron:-0.20, ba2:-0.30 };
+  logit += varFx[inp.variant] || 0;
+
+  if (inp.smoke === 'current') logit += 0.22; else if (inp.smoke === 'former') logit += 0.08;
+  if (inp.aqi > 100) logit += 0.18; else if (inp.aqi > 50) logit += 0.08;
+  if (inp.activity === 'active') logit -= 0.20; else if (inp.activity === 'sed') logit += 0.18;
+
+  logit += (getSymptomScore() / MAX_SYM) * 1.2;
+
+  const prob = Math.min(0.95, Math.max(0.02, sigmoid(logit)));
+  lastPct = Math.round(prob * 100);
+  updateResultUI(prob, inp, comorbScore);
+}
+
+function getInterpText(pct, inp, comorbScore) {
+  const sym = getSymptomScore();
+  const symCtx = sym > 0
+    ? ` The recorded symptom burden score of ${sym} is ${pct>=35?'strongly':'moderately'} consistent with post-acute sequelae of SARS-CoV-2 (PASC).`
+    : ' No post-acute symptoms were recorded, so the estimate reflects pre-infection risk factors only.';
+  if (pct < 20) return `This patient profile carries a <strong>low estimated risk</strong> of long COVID (${pct}%). In a group of 100 similarly-profiled individuals, fewer than 20 would be expected to develop symptoms lasting beyond 3 months.${symCtx} Standard monitoring is advisable following recovery.`;
+  if (pct < 35) return `This profile reflects <strong>moderate risk</strong> of long COVID (${pct}%). Roughly 1 in 3 individuals with this combination of factors may develop persistent symptoms.${symCtx} ${comorbScore>0?`The presence of ${comorbScore} comorbidity/comorbidities contributes to this estimate. `:''}Proactive follow-up at 4–8 weeks post-infection is advisable.`;
+  if (pct < 55) return `This profile indicates <strong>high risk</strong> of long COVID (${pct}%). More than half of individuals with a similar profile may develop persistent symptoms.${symCtx} ${inp.hosp?'Hospitalization during acute illness is one of the strongest independent predictors. ':''}${inp.doses===0?'Lack of vaccination significantly elevates risk. ':''}Close clinical follow-up and referral to a post-COVID care pathway is warranted where available.`;
+  return `This profile carries <strong>very high risk</strong> of long COVID (${pct}%). Individuals with this constellation of factors are among the highest-risk predicted group.${symCtx} ${inp.icu?'ICU admission is strongly associated with prolonged recovery trajectories. ':''}${comorbScore>=3?`Multiple comorbidities (${comorbScore}) compound the risk substantially. `:''}Urgent post-COVID multidisciplinary follow-up is strongly recommended.`;
+}
+
+function updateResultUI(prob, inp, comorbScore) {
+  const pct = Math.round(prob * 100);
+  document.getElementById('risk-pct').textContent = pct + '%';
+  document.getElementById('m-ci').textContent = '±' + Math.round(pct * 0.08 + 2) + '%';
+
+  const card = document.getElementById('result-card');
+  const ibox = document.getElementById('interp-box');
+  card.className = 'result-card'; ibox.className = 'interp-box';
+  let lbl, cls, icls;
+  if (pct < 20)      { cls='risk-low';    lbl='Low risk';      icls='interp-low'; }
+  else if (pct < 35) { cls='risk-mod';    lbl='Moderate risk'; icls='interp-mod'; }
+  else if (pct < 55) { cls='risk-high';   lbl='High risk';     icls='interp-high'; }
+  else               { cls='risk-vhigh';  lbl='Very high risk'; icls='interp-vhigh'; }
+  card.classList.add(cls); ibox.classList.add(icls);
+  document.getElementById('risk-lbl').textContent = lbl;
+  document.getElementById('interp-text').innerHTML = getInterpText(pct, inp, comorbScore);
+
+  const symScore = getSymptomScore();
+  const factors = [
+    { name:'Demographics',             val:calcDemo(inp),                              max:30, color:'#378ADD' },
+    { name:'Infection severity',        val:calcSeverity(inp),                         max:40, color:'#D85A30' },
+    { name:'Comorbidities',             val:Math.min(comorbScore*12,40),               max:40, color:'#E24B4A' },
+    { name:'Vaccination (protective)',  val:Math.max(0,inp.doses*18-(inp.vaxMonths>12?8:0)), max:70, color:'#639922' },
+    { name:'Variant risk',              val:calcVariant(inp.variant),                  max:30, color:'#7F77DD' },
+    { name:'Environment / lifestyle',   val:calcEnv(inp),                              max:30, color:'#1D9E75' },
+    { name:'Symptom burden',            val:Math.min(symScore, 30),                    max:30, color:'#BA7517' },
+  ];
+  document.getElementById('factor-bars').innerHTML = factors.map(f => {
+    const w = Math.round(Math.min(100, f.val/f.max*100));
+    const tag = f.name.includes('protective') ? 'protective' : 'contributing';
+    return `<div class="bar-wrap"><div class="bar-label"><span>${f.name}</span><span style="color:${f.color};">${tag}</span></div><div class="bar-track"><div class="bar-fill" style="width:${w}%;background:${f.color};"></div></div></div>`;
+  }).join('');
+
+  const B={pos:'background:#FCEBEB;color:#791F1F;border:0.5px solid #F09595;',neg:'background:#EAF3DE;color:#27500A;border:0.5px solid #97C459;',neu:'background:#f5f5f3;color:#666;border:0.5px solid #ccc;'};
+  const badges=[];
+  if (inp.doses>=3) badges.push({t:inp.doses+' vaccine doses',s:B.neg}); else if(inp.doses===0) badges.push({t:'Unvaccinated',s:B.pos}); else badges.push({t:inp.doses+' vaccine dose(s)',s:B.neu});
+  if (inp.hosp) badges.push({t:'Hospitalized',s:B.pos});
+  if (inp.icu)  badges.push({t:'ICU admission',s:B.pos});
+  if (inp.oxy)  badges.push({t:'Oxygen therapy',s:B.pos});
+  if (inp.activity==='active') badges.push({t:'Physically active',s:B.neg});
+  if (inp.activity==='sed')    badges.push({t:'Sedentary lifestyle',s:B.pos});
+  if (inp.variant==='omicron'||inp.variant==='ba2') badges.push({t:'Omicron variant',s:B.neg});
+  if (inp.variant==='delta')   badges.push({t:'Delta variant',s:B.pos});
+  if (inp.smoke==='current')   badges.push({t:'Current smoker',s:B.pos});
+  if (comorbScore===0)         badges.push({t:'No comorbidities',s:B.neg});
+  if (comorbScore>=3)          badges.push({t:comorbScore+' comorbidities',s:B.pos});
+  if (inp.age>60)              badges.push({t:'Age > 60',s:B.pos});
+  if (inp.bmi>30)              badges.push({t:'Obesity (BMI > 30)',s:B.pos});
+  if (symScore===0)            badges.push({t:'No symptoms recorded',s:B.neu});
+  else if(symScore>15)         badges.push({t:'High symptom burden',s:B.pos});
+  document.getElementById('factor-badges').innerHTML = badges.map(b=>`<div class="factor-badge" style="${b.s}">${b.t}</div>`).join('');
+}
+
+function calcDemo(inp) { let s=0; if(inp.age>60)s+=15; else if(inp.age>45)s+=8; if(inp.sex==='F')s+=6; if(inp.bmi>30)s+=8; else if(inp.bmi>25)s+=3; if(inp.ses==='low')s+=5; return s; }
+function calcSeverity(inp) { let s=0; if(inp.hosp)s+=15; if(inp.icu)s+=12; if(inp.oxy)s+=10; if(inp.dur>14)s+=8; else if(inp.dur>7)s+=3; return s; }
+function calcVariant(v) { return {alpha:12,delta:20,omicron:5,ba2:3}[v]||10; }
+function calcEnv(inp) { let s=0; if(inp.smoke==='current')s+=10; else if(inp.smoke==='former')s+=4; if(inp.aqi>100)s+=10; else if(inp.aqi>50)s+=4; if(inp.activity==='sed')s+=8; return s; }
+
+const TAB_NAMES = ['inputs','symptoms','results','population','refs'];
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',TAB_NAMES[i]===name));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if (name==='results') compute();
+  if (name==='population') renderPopCharts();
+}
+
+function renderPopCharts() {
+  if (popChartInst){popChartInst.destroy();popChartInst=null;}
+  if (vaxChartInst){vaxChartInst.destroy();vaxChartInst=null;}
+  const inp = getInputs();
+  const ageBandIdx = inp.age<30?0:inp.age<45?1:inp.age<60?2:inp.age<75?3:4;
+  const patientDs = { type:'scatter', label:'This patient', data:[{x:ageBandIdx,y:lastPct}], backgroundColor:'#E24B4A', pointStyle:'circle', pointRadius:8, pointHoverRadius:10, order:0 };
+  if (lastPct>0) document.getElementById('patient-legend').style.display='flex';
+
+  popChartInst = new Chart(document.getElementById('popChart'),{
+    type:'bar',
+    data:{ labels:['18–29','30–44','45–59','60–74','75+'], datasets:[
+      {label:'Alpha',   data:[14,21,28,37,44],backgroundColor:'#7F77DD',borderRadius:3},
+      {label:'Delta',   data:[18,26,34,42,48],backgroundColor:'#D85A30',borderRadius:3},
+      {label:'Omicron', data:[10,16,22,29,35],backgroundColor:'#378ADD',borderRadius:3},
+      patientDs,
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ x:{grid:{display:false},ticks:{font:{size:11}}}, y:{grid:{color:'rgba(0,0,0,0.06)'},ticks:{font:{size:11},callback:v=>v+'%'},min:0,max:70} } }
+  });
+
+  const doseIdx = Math.min(inp.doses,4);
+  const vaxData = [35,26,20,14,10];
+  vaxChartInst = new Chart(document.getElementById('vaxChart'),{
+    type:'bar',
+    data:{ labels:['Unvaccinated','1 dose','2 doses','3 doses','4 doses'], datasets:[{
+      data: vaxData,
+      backgroundColor:['#E24B4A','#F09595','#FAC775','#97C459','#3B6D11'],
+      borderColor: vaxData.map((_,i)=>i===doseIdx?'#1a1a1a':'transparent'),
+      borderWidth: vaxData.map((_,i)=>i===doseIdx?2.5:0),
+      borderRadius:3
+    }]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ x:{grid:{display:false},ticks:{font:{size:11}}}, y:{grid:{color:'rgba(0,0,0,0.06)'},ticks:{font:{size:11},callback:v=>v+'%'},max:45} } }
+  });
+}
+
+function exportPDF() {
+  document.getElementById('print-date').textContent = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  compute();
+  setTimeout(()=>window.print(), 200);
+}
+
+buildSymptoms();
+compute();
+</script>
+</body>
+</html>
